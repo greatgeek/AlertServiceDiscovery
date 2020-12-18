@@ -1,5 +1,7 @@
 package com.panghui.servicediscovery;
 
+import android.util.Log;
+
 public class Utils {
     /**
      * Turn AlerMessaage instance to a string.
@@ -19,12 +21,14 @@ public class Utils {
      * @return
      */
     public static AlerMessage StringToAlerMessage(String str){
+        Log.d("MyString",str);
         String[] strArr = str.split(",");
         String[] items = new String[strArr.length];
         for(int i=0;i<strArr.length;i++){
             items[i]=strArr[i].split("-")[1];
         }
 
+        if(items.length!=4) return null;
         AlerMessage item = new AlerMessage(items[0],Integer.parseInt(items[1]),items[2],
                 Boolean.parseBoolean(items[3]));
         return item;

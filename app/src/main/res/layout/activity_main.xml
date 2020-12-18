@@ -19,44 +19,49 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="355dp"
+        android:layout_height="375dp"
         android:orientation="horizontal">
 
         <ScrollView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:scrollbars="vertical"
-            android:fadingEdge="vertical">
+            android:fadingEdge="vertical"
+            android:scrollbars="vertical">
+
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
+
                 <EditText
                     android:id="@+id/text"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:maxLines="2"/>
+                    android:maxLines="2" />
 
                 <Button
                     android:id="@+id/addLocalService"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="addLocalService"/>
+                    android:text="addLocalService" />
+
                 <Button
                     android:id="@+id/removeLocalService"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="removeLocalService"/>
+                    android:text="removeLocalService" />
+
                 <Button
                     android:id="@+id/discoverService"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="discoverService"/>
+                    android:text="discoverService" />
+
                 <Button
                     android:id="@+id/showAllMessage"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="showAllMessage"/>
+                    android:text="showAllMessage" />
             </LinearLayout>
         </ScrollView>
 
@@ -64,22 +69,25 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="vertical">
+
             <TextView
                 android:id="@+id/logTextView"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="log:"
-                android:textStyle="bold"/>
+                android:textStyle="bold" />
+
             <ScrollView
                 android:id="@+id/scrollView"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:scrollbars="vertical"
-                android:fadingEdge="vertical">
+                android:fadingEdge="vertical"
+                android:scrollbars="vertical">
+
                 <TextView
                     android:id="@+id/log"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"/>
+                    android:layout_height="wrap_content" />
             </ScrollView>
         </LinearLayout>
 

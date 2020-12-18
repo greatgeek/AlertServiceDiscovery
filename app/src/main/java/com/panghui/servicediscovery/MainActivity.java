@@ -55,9 +55,10 @@ public class MainActivity extends AppCompatActivity {
     public static final String TAG = "ServiceDiscovery";
     public static final int SET_TEXTVIEW = 1000;
     public static final int DISCOVERY_SERVICE_DONE = 1001;
-    public static final int HANDLE_REMOTE_ITEMS_DONE = 1002;
+    public static final int HANDLE_REMOTE_LOCATION_ITEMS_DONE = 1002;
     public static final int SET_OWN_LOCATION = 1003;
     public static final int SET_OTHERS_LOCATION = 1004;
+    public static final int HANDLE_REMOTE_MESSAGE_ITEMS_DONE = 1005;
 
     private WifiP2pManager wifiP2pManager;
     private Channel channel;
@@ -74,19 +75,29 @@ public class MainActivity extends AppCompatActivity {
     public LocationClient mLocationClient = null;
     private MyLocationListener myLocationListener;
 
-    // 服务发现部分
-    public HashMap<String,String> localAlertTable = new HashMap<>(); // [sourceDeviceId,message]
-    public HashMap<String,String> remoteAlertTable = new HashMap<>(); // [sourceDeviceId,message]
-    public LinkedList<AlerMessage> localItems = new LinkedList<>();
+    // 服务发现坐标部分
+    public HashMap<String,String> localLocationAlertTable = new HashMap<>(); // [sourceDeviceId,location]
+    public HashMap<String,String> remoteLocationAlertTable = new HashMap<>(); // [sourceDeviceId,location]
+    public LinkedList<AlerMessage> localLocationItems = new LinkedList<>();
+    public HashMap<String,Integer> locationSeqNoRecord = new HashMap<>();// [deviceID,locationSeqNo]
+    public ConcurrentHashMap<String,Integer> locationTTL = new ConcurrentHashMap<>();// [location,TTL]
+    public Set<String> otherLocationSet = new HashSet<>(); // 收到其他的坐标位置集合
+    WifiP2pDnsSdServiceInfo locationServiceInfo;
+
+    // 服务发现消息部分
+    public HashMap<String,String> localMessageAlertTable = new HashMap<>(); // [sourceDeviceId,message]
+    public HashMap<String,String> remoteMessageAlertTable = new HashMap<>(); // [sourceDeviceId,message]
+    public LinkedList<AlerMessage> localMessageItems = new LinkedList<>();
     public HashMap<String,Integer> messageSeqNoRecord = new HashMap<>();// [deviceID,messageSeqNo]
     public ConcurrentHashMap<String,Integer> messageTTL = new ConcurrentHashMap<>();// [message,TTL]
-    public Set<String> otherLocationSet = new HashSet<>(); // 收到其他的坐标位置集合
+    public Set<String> otherMessageSet = new HashSet<>(); // 收到其他的信息位置集合
+    WifiP2pDnsSdServiceInfo messageServiceInfo;
 
     // 坐标标记图
     BitmapDescriptor bitmap_self = BitmapDescriptorFactory.fromResource(R.drawable.location_image_self);
     BitmapDescriptor bitmap_others = BitmapDescriptorFactory.fromResource(R.drawable.location_image_others);
 
-    public int seqNo = 0;
+    public int messageSeqNo = 0;
     public int TTL = 10;
 
     Timer Atimer = null;
@@ -143,16 +154,24 @@ public class MainActivity extends AppCompatActivity {
                 double lat=34.233894+random.nextDouble()*0.001,lng=108.920091+random.nextDouble()*0.001;
 
                 String location_str = lat+"_"+lng;
-                AlerMessage item = new AlerMessage(localAndroidID,seqNo++,location_str,true);
-                localItems.add(item);// 保存本地条目实例
-                messageTTL.put(Utils.AlerMessageToString(item),TTL); // 为该条目设置 TTL
-                localAlertTable.put(localAndroidID,Utils.AlerMessageToString(item));
+                AlerMessage item = new AlerMessage(localAndroidID,0,location_str,true);
+                localLocationItems.add(item);// 保存本地条目实例
+                locationTTL.put(Utils.AlerMessageToString(item),TTL); // 为该条目设置 TTL
+                localLocationAlertTable.put(localAndroidID,Utils.AlerMessageToString(item));
 
                 LatLng own_position = new LatLng(lat,lng);
                 otherLocationSet.add(location_str);
                 handler.obtainMessage(MainActivity.SET_OWN_LOCATION,own_position).sendToTarget();
-//                // 注册本地服务
-                startRegistration("message","signal",localAlertTable);
+
+                // 注册本地服务
+                locationServiceInfo = WifiP2pDnsSdServiceInfo.newInstance("alert","location",localLocationAlertTable);
+                AlerMessage messageItem = new AlerMessage(localAndroidID,messageSeqNo++,data,true);
+                localMessageItems.add(messageItem); // 保存本地消息条目
+                messageTTL.put(Utils.AlerMessageToString(messageItem),TTL); // 为消息条目设置 TTL
+                localMessageAlertTable.put(localAndroidID,Utils.AlerMessageToString(messageItem));
+                messageServiceInfo = WifiP2pDnsSdServiceInfo.newInstance("alert","message",localMessageAlertTable);
+                startRegistration(locationServiceInfo);
+                startRegistration(messageServiceInfo);
                 text.setText("");
             }
         });
@@ -222,8 +241,8 @@ public class MainActivity extends AppCompatActivity {
         showAllMessage.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Log.d(MainActivity.TAG,"showAllMessage:"+ localAlertTable.toString());// Success!
-                handler.obtainMessage(SET_TEXTVIEW,"showAllMessage:"+ localAlertTable.toString()).sendToTarget();
+                Log.d(MainActivity.TAG,"showAllMessage:"+ localLocationAlertTable.toString());// Success!
+                handler.obtainMessage(SET_TEXTVIEW,"showAllMessage:"+ localLocationAlertTable.toString()).sendToTarget();
             }
         });
 
@@ -258,7 +277,6 @@ public class MainActivity extends AppCompatActivity {
         channel = wifiP2pManager.initialize(this,getMainLooper(),null);
         // 注册服务发现的回调接口
         discoverService();
-
     }
 
     private void requestLocation(){
@@ -270,7 +288,6 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();
         //在activity执行onResume时执行mMapView. onResume ()，实现地图生命周期管理
         mMapView.onResume();
-
     }
 
     @Override
@@ -306,17 +323,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * 管理本地条目的征集周期
+     * 管理本地条目的征集周期(属于电量优化部分)
      */
     class DecreaseTTLForLocalItems implements Runnable{
 
         @Override
         public void run() {
-            for(String str:messageTTL.keySet()){
-                if(messageTTL.get(str)<=0){
-                    messageTTL.remove(str);
+            for(String str: locationTTL.keySet()){
+                if(locationTTL.get(str)<=0){
+                    locationTTL.remove(str);
                 }else {
-                    messageTTL.put(str,messageTTL.get(str)-1);
+                    locationTTL.put(str, locationTTL.get(str)-1);
                 }
             }
         }
@@ -363,27 +380,25 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    private void startRegistration(String instanceName,String serviceType,HashMap<String,String> record){
-        WifiP2pDnsSdServiceInfo serviceInfo =
-                WifiP2pDnsSdServiceInfo.newInstance(instanceName,serviceType,record);
+    // 注册本地坐标服务
+    private void startRegistration(WifiP2pDnsSdServiceInfo serviceInfo){
 
         wifiP2pManager.addLocalService(channel, serviceInfo, new WifiP2pManager.ActionListener() {
             @Override
             public void onSuccess() {
-//                Log.d(MainActivity.TAG,"注册本地服务成功");
-//                handler.obtainMessage(SET_TEXTVIEW,"注册本地服务成功").sendToTarget();
+                Log.d(MainActivity.TAG,"注册本地服务成功");
+                handler.obtainMessage(SET_TEXTVIEW,"注册本地服务成功").sendToTarget();
             }
 
             @Override
             public void onFailure(int reason) {
-//                Log.d(MainActivity.TAG,"注册本地服务失败");
-//                handler.obtainMessage(SET_TEXTVIEW,"注册本地服务失败").sendToTarget();
+                Log.d(MainActivity.TAG,"注册本地服务失败");
+                handler.obtainMessage(SET_TEXTVIEW,"注册本地服务失败").sendToTarget();
             }
         });
     }
 
 
-    ConcurrentHashMap<String, String> recordContent = new ConcurrentHashMap<>();
     /**
      * 注册服务发现的回调接口
      */
@@ -391,21 +406,24 @@ public class MainActivity extends AppCompatActivity {
         WifiP2pManager.DnsSdTxtRecordListener txtListener = new WifiP2pManager.DnsSdTxtRecordListener() {
             // 创建 WifiP2pManager.DnsSdTxtRecordListener 以监听传入的记录。
             @Override
-            public void onDnsSdTxtRecordAvailable(String dullDomain, Map<String, String> record, WifiP2pDevice device) {
-                Log.d(MainActivity.TAG,"DnsSdTxtRecord available - "+record.toString());
+            public void onDnsSdTxtRecordAvailable(String fullDomain, Map<String, String> record, WifiP2pDevice device) {
+                Log.d(MainActivity.TAG,"DnsSdTxtRecord available fullDomain - "+fullDomain);
                 handler.obtainMessage(SET_TEXTVIEW,"DnsSdTxtRecord available - "+ record.toString()).sendToTarget();
-                recordContent.clear();
-                recordContent.putAll(record);
-                new Thread(new HandlerRemoteItemTask(recordContent)).start();// 交给子线程进行处理
+
+                if(fullDomain.equals("alert.location.local.")){
+                    new Thread(new HandlerRemoteLocationItemTask((HashMap<String, String>) record)).start();// 交给子线程进行处理
+                }else if(fullDomain.equals("alert.message.local.")){
+                    new Thread(new HandlerRemoteMessageItemTask((HashMap<String, String>) record)).start(); // 交给子线程处理
+                }
             }
         };
 
         WifiP2pManager.DnsSdServiceResponseListener servListener = new WifiP2pManager.DnsSdServiceResponseListener() {
             @Override
             public void onDnsSdServiceAvailable(String instanceName, String registrationType, WifiP2pDevice resourceType) {
-                resourceType.deviceName = recordContent
-                        .containsKey(resourceType.deviceAddress) ? recordContent
-                        .get(resourceType.deviceAddress) : resourceType.deviceName;
+//                resourceType.deviceName = recordContent
+//                        .containsKey(resourceType.deviceAddress) ? recordContent
+//                        .get(resourceType.deviceAddress) : resourceType.deviceName;
 
                 Log.d(MainActivity.TAG,"onBonjourServiceAvailable"+instanceName);
                 handler.obtainMessage(SET_TEXTVIEW,"onBonjourServiceAvailable"+instanceName).sendToTarget();
@@ -417,13 +435,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * 处理远程警报条目
+     * 处理远程坐标条目
      */
-    class HandlerRemoteItemTask implements Runnable{
+    class HandlerRemoteLocationItemTask implements Runnable{
 
-        ConcurrentHashMap<String,String> AlertTable;
+        HashMap<String,String> AlertTable;
 
-        public HandlerRemoteItemTask(ConcurrentHashMap<String,String> AlertTable){
+        public HandlerRemoteLocationItemTask(HashMap<String,String> AlertTable){
                this.AlertTable =AlertTable;
         }
 
@@ -432,36 +450,82 @@ public class MainActivity extends AppCompatActivity {
             boolean isUpdate = false; // 指示所收到的内容是否有更新
             Set<String> deviceIDSet = new HashSet<>(AlertTable.keySet());
             for(String srcDeviceID:deviceIDSet){
+                if(AlertTable.get(srcDeviceID)==null) return;
+
                 AlerMessage item = Utils.StringToAlerMessage(AlertTable.get(srcDeviceID));
+                if(item==null) return;
                 boolean isAdd = otherLocationSet.add(item.data);
                 if(isAdd){
                     String[] doubleStr = item.data.split("_");
+                    if(doubleStr.length!=2) return;
                     LatLng otherLocation = new LatLng(Double.parseDouble(doubleStr[0]),Double.parseDouble(doubleStr[1]));
                     handler.obtainMessage(SET_OTHERS_LOCATION,otherLocation).sendToTarget();
                 }
+
+                if(!locationSeqNoRecord.containsKey(srcDeviceID) ||
+                        item.seqNo > locationSeqNoRecord.get(srcDeviceID)){ // seqNo > lastSeenSeqNo ?
+
+                    if(item.isValid){
+                        item.lastHopAddress= localAndroidID;// 将条目中的上一跳地址改成本地地址
+                        localLocationItems.add(item);// 加入本地条目
+                        locationTTL.put(Utils.AlerMessageToString(item),TTL); // 为该消息添加 TTL
+                        locationSeqNoRecord.put(srcDeviceID,item.seqNo); // 为该消息添加 seqNo
+                        remoteLocationAlertTable.put(srcDeviceID, Utils.AlerMessageToString(item)); // if isValid is true, create an alert record
+                        isUpdate=true;
+                    }
+                } // seqNo <= lastSeenSeqNo, discard
+            }
+            if(isUpdate){
+                handler.obtainMessage(SET_TEXTVIEW,"处理远程坐标条目完毕").sendToTarget();
+                handler.obtainMessage(HANDLE_REMOTE_LOCATION_ITEMS_DONE).sendToTarget(); // 处理完毕
+            }else {
+                handler.obtainMessage(SET_TEXTVIEW,"坐标条目无更新").sendToTarget();
+            }
+        }
+    }
+
+    /**
+     * 处理远程信息条目
+     */
+    class HandlerRemoteMessageItemTask implements Runnable{
+
+        HashMap<String,String> AlertTable;
+
+        public HandlerRemoteMessageItemTask(HashMap<String,String> AlertTable){
+            this.AlertTable =AlertTable;
+        }
+
+        @Override
+        public void run() {
+            boolean isUpdate = false; // 指示所收到的内容是否有更新
+            Set<String> deviceIDSet = new HashSet<>(AlertTable.keySet());
+            for(String srcDeviceID:deviceIDSet){
+                if(AlertTable.get(srcDeviceID)==null) return;
+
+                AlerMessage item = Utils.StringToAlerMessage(AlertTable.get(srcDeviceID));
+                if(item==null) return;
 
                 if(!messageSeqNoRecord.containsKey(srcDeviceID) ||
                         item.seqNo > messageSeqNoRecord.get(srcDeviceID)){ // seqNo > lastSeenSeqNo ?
 
                     if(item.isValid){
                         item.lastHopAddress= localAndroidID;// 将条目中的上一跳地址改成本地地址
-                        localItems.add(item);// 加入本地条目
+                        localMessageItems.add(item);// 加入本地条目
                         messageTTL.put(Utils.AlerMessageToString(item),TTL); // 为该消息添加 TTL
                         messageSeqNoRecord.put(srcDeviceID,item.seqNo); // 为该消息添加 seqNo
-                        remoteAlertTable.put(srcDeviceID, Utils.AlerMessageToString(item)); // if isValid is true, create an alert record
+                        remoteMessageAlertTable.put(srcDeviceID, Utils.AlerMessageToString(item)); // if isValid is true, create an alert record
                         isUpdate=true;
                     }
                 } // seqNo <= lastSeenSeqNo, discard
             }
             if(isUpdate){
-                handler.obtainMessage(SET_TEXTVIEW,"处理远程条目完毕").sendToTarget();
-                handler.obtainMessage(HANDLE_REMOTE_ITEMS_DONE).sendToTarget(); // 处理完毕
+                handler.obtainMessage(SET_TEXTVIEW,"处理远程消息条目完毕").sendToTarget();
+                handler.obtainMessage(HANDLE_REMOTE_MESSAGE_ITEMS_DONE).sendToTarget(); // 处理完毕
             }else {
-                handler.obtainMessage(SET_TEXTVIEW,"无更新").sendToTarget();
+                handler.obtainMessage(SET_TEXTVIEW,"消息条目无更新").sendToTarget();
             }
         }
     }
-
 
 
 
@@ -496,14 +560,55 @@ public class MainActivity extends AppCompatActivity {
                     break;
                 }
 
-                case HANDLE_REMOTE_ITEMS_DONE:{
-                    wifiP2pManager.clearLocalServices(channel,null); // 清除本地服务
-                    Set<String> keySet = new HashSet<>(remoteAlertTable.keySet());
+                case HANDLE_REMOTE_LOCATION_ITEMS_DONE:{
+                    // 清除本地服务
+                    wifiP2pManager.removeLocalService(channel, locationServiceInfo, new WifiP2pManager.ActionListener() {
+                        @Override
+                        public void onSuccess() {
+                            Log.d(TAG,"removeLocalService 成功");
+                            handler.obtainMessage(SET_TEXTVIEW,"removeLocalService 成功").sendToTarget();
+                        }
+
+                        @Override
+                        public void onFailure(int reason) {
+                            Log.d(TAG,"removeLocalService 失败");
+                            handler.obtainMessage(SET_TEXTVIEW,"removeLocalService 失败").sendToTarget();
+                        }
+                    });
+
+                    Set<String> keySet = new HashSet<>(remoteLocationAlertTable.keySet());
                     for (String key : keySet){
-                        localAlertTable.put(key,remoteAlertTable.get(key));
+                        localLocationAlertTable.put(key, remoteLocationAlertTable.get(key));
                     }
 
-                    startRegistration("message","signal",localAlertTable);
+                    WifiP2pDnsSdServiceInfo serviceInfo = WifiP2pDnsSdServiceInfo.newInstance("alert","location", localLocationAlertTable);
+                    startRegistration(serviceInfo);
+                    break;
+                }
+
+                case HANDLE_REMOTE_MESSAGE_ITEMS_DONE:{
+                    // 清除本地服务
+                    wifiP2pManager.removeLocalService(channel, messageServiceInfo, new WifiP2pManager.ActionListener() {
+                        @Override
+                        public void onSuccess() {
+                            Log.d(TAG,"removeLocalService 成功");
+                            handler.obtainMessage(SET_TEXTVIEW,"removeLocalService 成功").sendToTarget();
+                        }
+
+                        @Override
+                        public void onFailure(int reason) {
+                            Log.d(TAG,"removeLocalService 失败");
+                            handler.obtainMessage(SET_TEXTVIEW,"removeLocalService 失败").sendToTarget();
+                        }
+                    });
+
+                    Set<String> keySet = new HashSet<>(remoteMessageAlertTable.keySet());
+                    for (String key : keySet){
+                        localMessageAlertTable.put(key, remoteMessageAlertTable.get(key));
+                    }
+
+                    WifiP2pDnsSdServiceInfo serviceInfo = WifiP2pDnsSdServiceInfo.newInstance("alert","location", localMessageAlertTable);
+                    startRegistration(serviceInfo);
                     break;
                 }
 
