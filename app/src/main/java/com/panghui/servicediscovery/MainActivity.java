@@ -78,7 +78,7 @@ public class MainActivity extends AppCompatActivity {
     // 服务发现坐标部分
     public HashMap<String,String> localLocationAlertTable = new HashMap<>(); // [sourceDeviceId,location]
     public HashMap<String,String> remoteLocationAlertTable = new HashMap<>(); // [sourceDeviceId,location]
-    public LinkedList<AlerMessage> localLocationItems = new LinkedList<>();
+    public LinkedList<AlertMessage> localLocationItems = new LinkedList<>();
     public HashMap<String,Integer> locationSeqNoRecord = new HashMap<>();// [deviceID,locationSeqNo]
     public ConcurrentHashMap<String,Integer> locationTTL = new ConcurrentHashMap<>();// [location,TTL]
     public Set<String> otherLocationSet = new HashSet<>(); // 收到其他的坐标位置集合
@@ -87,7 +87,7 @@ public class MainActivity extends AppCompatActivity {
     // 服务发现消息部分
     public HashMap<String,String> localMessageAlertTable = new HashMap<>(); // [sourceDeviceId,message]
     public HashMap<String,String> remoteMessageAlertTable = new HashMap<>(); // [sourceDeviceId,message]
-    public LinkedList<AlerMessage> localMessageItems = new LinkedList<>();
+    public LinkedList<AlertMessage> localMessageItems = new LinkedList<>();
     public HashMap<String,Integer> messageSeqNoRecord = new HashMap<>();// [deviceID,messageSeqNo]
     public ConcurrentHashMap<String,Integer> messageTTL = new ConcurrentHashMap<>();// [message,TTL]
     public Set<String> otherMessageSet = new HashSet<>(); // 收到其他的信息位置集合
@@ -154,7 +154,7 @@ public class MainActivity extends AppCompatActivity {
                 double lat=34.233894+random.nextDouble()*0.001,lng=108.920091+random.nextDouble()*0.001;
 
                 String location_str = lat+"_"+lng;
-                AlerMessage item = new AlerMessage(localAndroidID,0,location_str,true);
+                AlertMessage item = new AlertMessage(localAndroidID,0,location_str,true);
                 localLocationItems.add(item);// 保存本地条目实例
                 locationTTL.put(Utils.AlerMessageToString(item),TTL); // 为该条目设置 TTL
                 localLocationAlertTable.put(localAndroidID,Utils.AlerMessageToString(item));
@@ -165,7 +165,7 @@ public class MainActivity extends AppCompatActivity {
 
                 // 注册本地服务
                 locationServiceInfo = WifiP2pDnsSdServiceInfo.newInstance("alert","location",localLocationAlertTable);
-                AlerMessage messageItem = new AlerMessage(localAndroidID,messageSeqNo++,data,true);
+                AlertMessage messageItem = new AlertMessage(localAndroidID,messageSeqNo++,data,true);
                 localMessageItems.add(messageItem); // 保存本地消息条目
                 messageTTL.put(Utils.AlerMessageToString(messageItem),TTL); // 为消息条目设置 TTL
                 localMessageAlertTable.put(localAndroidID,Utils.AlerMessageToString(messageItem));
@@ -452,10 +452,10 @@ public class MainActivity extends AppCompatActivity {
             for(String srcDeviceID:deviceIDSet){
                 if(AlertTable.get(srcDeviceID)==null) return;
 
-                AlerMessage item = Utils.StringToAlerMessage(AlertTable.get(srcDeviceID));
+                AlertMessage item = Utils.StringToAlerMessage(AlertTable.get(srcDeviceID));
                 if(item==null) return;
                 boolean isAdd = otherLocationSet.add(item.data);
-                if(isAdd){
+                if(isAdd && item.data!=null){
                     String[] doubleStr = item.data.split("_");
                     if(doubleStr.length!=2) return;
                     LatLng otherLocation = new LatLng(Double.parseDouble(doubleStr[0]),Double.parseDouble(doubleStr[1]));
@@ -502,7 +502,7 @@ public class MainActivity extends AppCompatActivity {
             for(String srcDeviceID:deviceIDSet){
                 if(AlertTable.get(srcDeviceID)==null) return;
 
-                AlerMessage item = Utils.StringToAlerMessage(AlertTable.get(srcDeviceID));
+                AlertMessage item = Utils.StringToAlerMessage(AlertTable.get(srcDeviceID));
                 if(item==null) return;
 
                 if(!messageSeqNoRecord.containsKey(srcDeviceID) ||

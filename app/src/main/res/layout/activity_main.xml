@@ -43,25 +43,29 @@
                     android:id="@+id/addLocalService"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="addLocalService" />
+                    android:textAllCaps="false"
+                    android:text="add local service" />
 
                 <Button
                     android:id="@+id/removeLocalService"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="removeLocalService" />
+                    android:textAllCaps="false"
+                    android:text="remove local service" />
 
                 <Button
                     android:id="@+id/discoverService"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="discoverService" />
+                    android:textAllCaps="false"
+                    android:text="perform service discovery" />
 
                 <Button
                     android:id="@+id/showAllMessage"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="showAllMessage" />
+                    android:textAllCaps="false"
+                    android:text="show all message" />
             </LinearLayout>
         </ScrollView>
 

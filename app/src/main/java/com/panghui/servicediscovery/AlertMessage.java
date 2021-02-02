@@ -1,12 +1,12 @@
 package com.panghui.servicediscovery;
 
-public class AlerMessage {
+public class AlertMessage {
     String lastHopAddress;
     Integer seqNo;
     String data;
     Boolean isValid;
 
-    public AlerMessage(String lastHopAddress, Integer seqNo, String data, Boolean isValid) {
+    public AlertMessage(String lastHopAddress, Integer seqNo, String data, Boolean isValid) {
         this.lastHopAddress = lastHopAddress;
         this.seqNo = seqNo;
         this.data = data;
