@@ -1,26 +1,25 @@
 package com.panghui.servicediscovery;
 
 public class AlertMessage {
-    String lastHopAddress;
+    String deviceID;
     Integer seqNo;
     String data;
     Boolean isValid;
 
-    public AlertMessage(String lastHopAddress, Integer seqNo, String data, Boolean isValid) {
-        this.lastHopAddress = lastHopAddress;
+    public AlertMessage(String deviceID, Integer seqNo, String data, Boolean isValid) {
+        this.deviceID = deviceID;
         this.seqNo = seqNo;
         this.data = data;
         this.isValid = isValid;
     }
 
-    public String getLastHopAddress() {
-        return lastHopAddress;
+    public String getDeviceID() {
+        return deviceID;
     }
 
-    public void setLastHopAddress(String lastHopAddress) {
-        this.lastHopAddress = lastHopAddress;
+    public void setDeviceID(String deviceID) {
+        this.deviceID = deviceID;
     }
-
 
     public Integer getSeqNo() {
         return seqNo;
@@ -50,7 +49,7 @@ public class AlertMessage {
     @Override
     public String toString() {
         return "AlerMessage{" +
-                "SourceAdddress-'" + lastHopAddress + '\'' +
+                "SourceAdddress-'" + deviceID + '\'' +
                 ", seqNo-" + seqNo +
                 ", data-'" + data + '\'' +
                 ", isValid-" + isValid +

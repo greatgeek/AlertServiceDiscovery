@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/addLocalService"
+        android:icon="@drawable/ic_action_on_off"
+        android:title="add local service"
+        app:showAsAction="ifRoom"/>
+    <item
+        android:id="@+id/performServiceDiscovery"
+        android:icon="@drawable/ic_action_discover"
+        android:title="perform service discovery"
+        app:showAsAction="ifRoom"/>
+
+</menu>
